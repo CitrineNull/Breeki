@@ -1,0 +1,17 @@
+[Unit]
+Description=Media Server Utility Services
+Requires=network-online.target zfs-public-mount.service
+After=network-online.target zfs-public-mount.service
+
+[Service]
+ExecStartPre=/usr/local/bin/check-vpn vpn
+ExecStartPre=/usr/local/bin/check-mount public
+ExecStart=/usr/local/bin/media-server start public
+ExecReload=/usr/local/bin/media-server restart public
+ExecStop=/usr/local/bin/media-server stop public
+Type=oneshot
+RemainAfterExit=true
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

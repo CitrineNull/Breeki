@@ -1,0 +1,16 @@
+[Unit]
+Description=Media Server Utility Services
+
+[Service]
+ExecStartPre=/usr/local/bin/check-vpn vpn
+ExecStartPre=/usr/local/bin/check-mount private 
+ExecStart=/usr/local/bin/media-server start private
+ExecReload=/usr/local/bin/media-server restart private-only
+ExecStop=/usr/local/bin/media-server stop private-only
+Type=oneshot
+RemainAfterExit=true
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,208 @@
+x-private-defaults: &private-defaults
+    networks:
+        - homelab-network
+    # Use the Pi-Hole as DNS for every container
+    dns:
+        - ${PIHOLE_IPV4}
+        - ${PIHOLE_IPV6}
+    # Enable Podman auto-updates
+    labels:
+        - io.containers.autoupdate=registry
+    # Disable escalating privileges
+    security_opt:
+        - no-new-privileges:true
+    # Try restarting 3 times if the container fails, then give up
+    restart: on-failure:3
+    userns_mode: keep-id:uid=${PUID},gid=${PGID}
+    user: 0:0
+
+x-podman:
+    in_pod: false
+
+# networks:
+#     homelab-network:
+#         name: homelab-network
+#         ipam:
+#             driver: default
+#             config:
+#                 - subnet: ${IPV4_SUBNET}
+#                 - subnet: ${IPV6_SUBNET}
+
+# These services require my private partition to be decrypted, and are intended just for me, not the whole LAN
+# docker-compose.utils.yaml is required to be running
+services:
+
+    # A private qbittorrent instance, separate to the one used by the rest of the *arr suite
+    qbittorrent-private:
+        image: ghcr.io/qbittorrent/docker-qbittorrent-nox
+        # image: lscr.io/linuxserver/qbittorrent
+        container_name: qbittorrent-private
+        <<: *private-defaults
+        userns_mode: keep-id:uid=1000,gid=1000
+        # user: "${PUID}:${PGID}"
+        environment:
+            # - PUID=${PUID}
+            # - PGID=${PGID}
+            - TZ=Europe/London
+            - QBT_LEGAL_NOTICE=confirm
+        volumes:
+            - ${PRIVATE_SHARE_PATH}/Downloads:/downloads
+            - ${CONFIG_DIRECTORY}/qbittorrent-private:/config
+
+    # MariaDB acts as a MySQL database for our Nextcloud
+    mariadb:
+        image: docker.io/library/mariadb:latest
+        container_name: mariadb
+        <<: *private-defaults
+        userns_mode: keep-id:uid=999,gid=999
+        environment:
+            - MYSQL_RANDOM_ROOT_PASSWORD=true
+            - MYSQL_PASSWORD=${MARIADB_PASSWORD}
+            - MYSQL_DATABASE=nextcloud
+            - MYSQL_USER=nextcloud
+            - MARIADB_AUTO_UPGRADE=1
+            - MARIADB_DISABLE_UPGRADE_BACKUP=1
+        volumes:
+            - ${CONFIG_DIRECTORY}/mariadb:/var/lib/mysql
+        command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+
+    # Redis acts as a memcache for our Nextcloud, and helps prevent locking problems
+    redis-nextcloud:
+        image: docker.io/library/redis:alpine
+        container_name: redis-nextcloud
+        <<: *private-defaults
+        userns_mode: keep-id:uid=999,gid=0
+        volumes:
+            - ${CONFIG_DIRECTORY}/redis-nextcloud:/data
+        command: --requirepass ${REDIS_NEXTCLOUD_PASSWORD}
+
+    # Nextcloud for Tasks, Calendar, Contacts, photo backups and a WebDAV fileshare
+    nextcloud:
+        image: docker.io/library/nextcloud:apache
+        container_name: nextcloud
+        <<: *private-defaults
+        userns_mode: keep-id:uid=33,gid=33
+        environment:
+            - REDIS_HOST=redis
+            - REDIS_HOST_PASSWORD=${REDIS_NEXTCLOUD_PASSWORD}
+            - MYSQL_HOST=mariadb
+            - MYSQL_DATABASE=nextcloud
+            - MYSQL_USER=nextcloud
+            - MYSQL_PASSWORD=${MARIADB_PASSWORD}
+            - NEXTCLOUD_DATA_DIR=/nextcloud-data
+            # - APACHE_DISABLE_REWRITE_IP=1
+            # - TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/1,192.168.0.0/16
+        volumes:
+            - ${CONFIG_DIRECTORY}/nextcloud:/var/www/html
+            - ${NEXTCLOUD_DATA_DIRECTORY}:/var/www/html/data
+        depends_on:
+            - mariadb
+            - redis-nextcloud
+
+    # For Nextcloud database cleanups, regular maintainance, etc.
+    nextcloud-cron:
+        image: docker.io/library/nextcloud:apache
+        container_name: nextcloud-cron
+        <<: *private-defaults
+        userns_mode: keep-id:uid=33,gid=33
+        volumes:
+            - ${CONFIG_DIRECTORY}/nextcloud:/var/www/html
+        depends_on:
+            - mariadb
+            - redis-nextcloud
+        entrypoint: /cron.sh
+
+    # For creating documents with LaTeX
+    overleaf:
+        image: docker.io/sharelatex/sharelatex
+        container_name: overleaf
+        <<: *private-defaults
+        userns_mode: host
+        environment:
+            OVERLEAF_APP_NAME: Overleaf Community Edition
+            OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
+            OVERLEAF_REDIS_HOST: redis-overleaf
+            REDIS_HOST: redis-overleaf
+            OVERLEAF_REDIS_PASS: ${REDIS_OVERLEAF_PASSWORD}
+            ENABLED_LINKED_FILE_TYPES: 'project_file,project_output_file'
+            ENABLE_CONVERSIONS: 'true'
+            EMAIL_CONFIRMATION_DISABLED: 'true'
+            TEXMFVAR: /var/lib/overleaf/tmp/texmf-var
+            ENABLE_CRON_RESOURCE_DELETION: true
+        # Give more time during shutdown to save work
+        stop_grace_period: 60s
+        depends_on:
+            mongo:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        volumes:
+            - ${PRIVATE_SHARE_PATH}/Documents/Overleaf:/var/lib/overleaf
+
+    # MongoDB stores our documents for Overleaf, pinned to version 5 as per Overleaf docs
+    mongo:
+        image: docker.io/library/mongo:5
+        container_name: mongo
+        <<: *private-defaults
+        userns_mode: keep-id:uid=999,gid=999
+        command: ["mongod", "--ipv6", "--replSet", "rs0"]
+        volumes:
+            - ${CONFIG_DIRECTORY}/mongodb:/data/db
+        healthcheck:
+            test: echo 'db.stats().ok' | mongo localhost:27017/test --quiet
+            interval: 10s
+            timeout: 10s
+            retries: 5
+        extra_hosts:
+            - "mongo:127.0.0.1"
+
+    # I'm not really sure, but it overleaf doesn't work without it: https://github.com/overleaf/overleaf/issues/1188
+    mongo-init:
+        image: docker.io/library/mongo:5
+        container_name: mongo-init
+        <<: *private-defaults
+        userns_mode: keep-id:uid=999,gid=999
+        entrypoint:
+            [
+                "mongo",
+                "--host",
+                "mongo:27017",
+                "--eval",
+                'rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo:27017"}]})',
+            ]
+        depends_on:
+            mongo:
+                condition: service_healthy
+        restart: "no"
+
+    # Redis instance for overleaf, pinned to version 6 as per Overleaf docs
+    redis-overleaf:
+        image: docker.io/library/redis:6
+        container_name: redis-overleaf
+        <<: *private-defaults
+        userns_mode: keep-id:uid=999,gid=0
+        volumes:
+            - ${CONFIG_DIRECTORY}/redis-overleaf:/data
+        command: --requirepass ${REDIS_OVERLEAF_PASSWORD}
+
+    # A self-hosted VSCode instance so I don't have to make a development environment on all my devices
+    code-server:
+        image: lscr.io/linuxserver/code-server
+        container_name: code-server
+        <<: *private-defaults
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+            - TZ=Europe/London
+            - PASSWORD=${CODE_PASSWORD}
+            - SUDO_PASSWORD=${CODE_SUDO_PASSWORD}
+            - DEFAULT_WORKSPACE=/projects
+        volumes:
+            - ${PRIVATE_SHARE_PATH}/Documents/Code:/projects
+            - ${CONFIG_DIRECTORY}/code-server:/config
+        # Allow using Sudo in web terminal
+        security_opt:
+            - no-new-privileges:false
+        # ports:
+        # - 8443:8443
+        # restart: unless-stopped

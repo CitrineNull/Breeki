@@ -1,0 +1,198 @@
+x-media-defaults: &media-defaults
+    networks:
+        - homelab-network
+    # Use the Pi-Hole as DNS for every container
+    dns:
+        - ${PIHOLE_IPV4}
+        - ${PIHOLE_IPV6}
+    # Enable Podman auto-updates
+    labels:
+        - io.containers.autoupdate=registry
+    # Drop from root to user privileges (lscr.io/linuxserver images only)
+    environment:
+        - PUID=${PUID}
+        - PGID=${PGID}
+        - TZ=Europe/London
+    # Disable escalating privileges
+    security_opt:
+        - no-new-privileges:true
+    # Try restarting 3 times if the container fails, then give up
+    restart: on-failure:3
+    userns_mode: keep-id:uid=${PUID},gid=${PGID}
+    user: 0:0
+
+x-podman:
+    in_pod: false
+
+# networks:
+#     homelab-network:
+#         name: homelab-network
+#         ipam:
+#             driver: default
+#             config:
+#                 - subnet: ${IPV4_SUBNET}
+#                 - subnet: ${IPV6_SUBNET}
+
+# These are the media-related services, docker-compose.utils.yaml is required to be running
+services:
+
+    # Jellyfin is our main media center, essentially a better Plex, default port is 8096
+    jellyfin:
+        image: docker.io/jellyfin/jellyfin
+        container_name: jellyfin
+        <<: *media-defaults
+        user: "${PUID}:${PGID}"
+        volumes:
+            - ${MEDIA_DIRECTORY}/movies:/media/movies:ro
+            - ${MEDIA_DIRECTORY}/tvshows:/media/tvshows:ro
+            - ${MEDIA_DIRECTORY}/music:/media/music:ro
+            - ${MEDIA_DIRECTORY}/ebooks:/media/ebooks:ro
+            - ${CONFIG_DIRECTORY}/jellyfin:/config
+
+    # Jellyseerr is used to request movies to download for Jellyfin, like Overseerr for Plex, default port is 5055
+    jellyseerr:
+        image: docker.io/fallenbagel/jellyseerr
+        container_name: jellyseerr
+        <<: *media-defaults
+        user: "${PUID}:${PGID}"
+        environment:
+            # - LOG_LEVEL=debug
+            - TZ=Europe/London
+            # - PORT=5055 #optional
+        # ports:
+        #     - 5055:5055
+        volumes:
+            - ${CONFIG_DIRECTORY}/jellyseerr:/app/config
+        depends_on:
+            - jellyfin
+    
+    # Sonarr is used to query, add downloads to the download queue and index TV shows, default port is 8989
+    sonarr:
+        image: lscr.io/linuxserver/sonarr
+        container_name: sonarr
+        <<: *media-defaults
+        volumes:
+            - ${MEDIA_DIRECTORY}/tvshows:/tv
+            - ${MEDIA_DIRECTORY}/downloads:/downloads
+            - ${CONFIG_DIRECTORY}/sonarr:/config
+        depends_on:
+            - qbittorrent
+
+    # Radarr is used to query, add downloads to the download queue and index Movies, default port is 7878
+    radarr:
+        image: lscr.io/linuxserver/radarr
+        container_name: radarr
+        <<: *media-defaults
+        volumes:
+            - ${MEDIA_DIRECTORY}/movies:/movies
+            - ${MEDIA_DIRECTORY}/downloads:/downloads
+            - ${CONFIG_DIRECTORY}/radarr:/config
+
+    # Lidarr is used to query, add downloads to the download queue and index Music, default port is 8686
+    lidarr:
+        image: lscr.io/linuxserver/lidarr
+        container_name: lidarr
+        <<: *media-defaults
+        volumes:
+            - ${MEDIA_DIRECTORY}/music:/music
+            - ${MEDIA_DIRECTORY}/downloads:/downloads
+            - ${CONFIG_DIRECTORY}/lidarr:/config
+        depends_on:
+            - qbittorrent
+
+
+    # Readarr is used to query, add downloads to the download queue and index Audio and Ebooks, default port is 8787
+    readarr:
+        image: lscr.io/linuxserver/readarr:develop
+        container_name: readarr
+        <<: *media-defaults
+        volumes:
+            - ${MEDIA_DIRECTORY}/ebooks:/books
+            - ${MEDIA_DIRECTORY}/downloads:/downloads
+            - ${CONFIG_DIRECTORY}/readarr:/config
+        depends_on:
+            - qbittorrent
+
+    # Bazarr is used to download and categorize subtitles, default port is 6767
+    bazarr:
+        image: lscr.io/linuxserver/bazarr
+        container_name: bazarr
+        <<: *media-defaults
+        volumes:
+            - ${MEDIA_DIRECTORY}/movies:/movies
+            - ${MEDIA_DIRECTORY}/tvshows:/tv
+            - ${CONFIG_DIRECTORY}/bazarr:/config
+        depends_on:
+            - qbittorrent
+
+    # Prowlarr is our torrent indexer/searcher. Sonarr/Radarr use Prowlarr as a source, default port is 9696
+    prowlarr:
+        image: lscr.io/linuxserver/prowlarr
+        container_name: prowlarr
+        <<: *media-defaults
+        volumes:
+            - ${CONFIG_DIRECTORY}/prowlarr:/config
+        depends_on:
+            - radarr
+            - readarr
+            - lidarr
+            - sonarr
+            - flaresolverr
+
+    # Flaresolverr allows our torrent indexers to bypass the Cloudflare bot checks
+    flaresolverr:
+        image: ghcr.io/flaresolverr/flaresolverr:latest
+        container_name: flaresolverr
+        <<: *media-defaults
+        environment:
+            - LOG_LEVEL=${LOG_LEVEL:-info}
+            - LOG_HTML=${LOG_HTML:-false}
+            - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+            - TZ=Europe/London
+        # ports:
+        #   - "${PORT:-8191}:8191"
+
+    # Kapowarr is for building and managing manga/manhwa/comics libraries, default port is 5656
+    kapowarr:
+        image: docker.io/mrcas/kapowarr
+        container_name: kapowarr
+        <<: *media-defaults
+        userns_mode: host
+        # No rootless user support as of 05/08/2024 https://github.com/Casvt/Kapowarr/issues/144
+        volumes:
+            - ${CONFIG_DIRECTORY}/kapowarr:/app/db
+            - ${MEDIA_DIRECTORY}/downloads:/app/temp_downloads
+            - ${MEDIA_DIRECTORY}/ebooks:/ebooks
+
+  # Kavita is an online comic book reader, whereas downloads will be handled by Kapowarr, default port is 5000
+    kavita:
+        image: docker.io/jvmilazz0/kavita
+        container_name: kavita
+        <<: *media-defaults
+        userns_mode: host
+        volumes:
+            - ${MEDIA_DIRECTORY}/ebooks:/ebooks
+            # - ${MEDIA_DIRECTORY}/ebooks/manga:/manga
+            # - ${MEDIA_DIRECTORY}/ebooks/manhwa:/manhwa
+            # - ${MEDIA_DIRECTORY}/ebooks/comics:/comics
+            # - ${MEDIA_DIRECTORY}/ebooks/books:/books
+            - ${CONFIG_DIRECTORY}/kavita:/kavita/config
+
+    # qBitorrent is used to download torrents, default port is 8080
+    qbittorrent:
+        image: ghcr.io/qbittorrent/docker-qbittorrent-nox
+        # image: lscr.io/linuxserver/qbittorrent:latest
+        container_name: qbittorrent
+        <<: *media-defaults
+        # security_opt:
+        #     - no-new-privileges:false
+        userns_mode: keep-id:uid=1000,gid=1000
+        # userns_mode: host
+
+        # user: "${PUID}:${PGID}"
+        environment:
+            - TZ=Europe/London
+            - QBT_LEGAL_NOTICE=confirm       
+        volumes:
+            - ${MEDIA_DIRECTORY}/downloads:/downloads
+            - ${CONFIG_DIRECTORY}/qbittorrent:/config

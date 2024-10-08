@@ -1,0 +1,273 @@
+# You can enable this if you want, I just didn't expose port 80 at all
+# http:// {
+
+#   redir https://{host}{uri} permanent
+
+# }
+
+https:// {
+
+    encode zstd gzip
+
+    tls internal {
+        on_demand
+    }
+
+    # Pi-Hole
+    @pihole-redir {
+        path /pihole /pihole/ /pi-hole /pi-hole/
+    }
+    handle @pihole-redir {
+        redir https://pi-hole.{host}/admin
+    }
+    @pihole {
+        header_regexp domain Host ^(pihole|pi-hole)\.(.*)$
+    }
+	handle @pihole {
+        redir / /admin
+        reverse_proxy pihole:80
+    }
+
+    # Qbittorrent Public
+    @qbittorrent-redir {
+        path /qbit /qbit/ /qbittorrent /qbittorrent/ /qbittorrent-public /qbittorrent-public/
+    }
+    handle @qbittorrent-redir {
+        redir https://qbittorrent.{host}
+    }
+    @qbittorrent {
+        header_regexp domain Host ^(qbit|qbittorrent|qbittorrent-public)\.(.*)$
+    }
+	handle @qbittorrent {
+        reverse_proxy qbittorrent:8080
+    }
+
+    # Qbittorrent Private
+    @qbittorrent-private-redir {
+        path /qbit-priv /qbit-priv/ /qbittorrent-private /qbittorrent-private/
+    }
+    handle @qbittorrent-private-redir {
+        redir https://qbittorrent-private.{host}
+    }
+    @qbittorrent-private {
+        header_regexp domain Host ^(qbit-priv|qbittorrent-private)\.(.*)$
+    }
+	handle @qbittorrent-private {
+        reverse_proxy qbittorrent-private:8080
+    }
+
+    # Jellyfin
+    @jellyfin-redir {
+        path /jellyfin /jellyfin/
+    }
+    handle @jellyfin-redir {
+        redir https://jellyfin.{host}
+    }
+    @jellyfin {
+        header_regexp domain Host ^(jellyfin)\.(.*)$
+    }
+	handle @jellyfin {
+        reverse_proxy jellyfin:8096
+    }
+
+    # Jellyseerr
+    @jellyseerr-redir {
+        path /jellyseerr /jellyseerr/
+    }
+    handle @jellyseerr-redir {
+        redir https://jellyseerr.{host}
+    }
+    @jellyseerr {
+        header_regexp domain Host ^(jellyseerr)\.(.*)$
+    }
+	handle @jellyseerr {
+        reverse_proxy jellyseerr:5055
+    }
+
+    # Sonarr
+    @sonarr-redir {
+        path /sonarr /sonarr/
+    }
+    handle @sonarr-redir {
+        redir https://sonarr.{host}
+    }
+    @sonarr {
+        header_regexp domain Host ^(sonarr)\.(.*)$
+    }
+	handle @sonarr {
+        reverse_proxy sonarr:8989
+    }
+
+    # Radarr
+    @radarr-redir {
+        path /sonarr /sonarr/
+    }
+    handle @radarr-redir {
+        redir https://radarr.{host}
+    }
+    @radarr {
+        header_regexp domain Host ^(radarr)\.(.*)$
+    }
+	handle @radarr {
+        reverse_proxy radarr:7878
+    }
+
+    # Lidarr
+    @lidarr-redir {
+        path /lidarr /lidarr/
+    }
+    handle @lidarr-redir {
+        redir https://lidarr.{host}
+    }
+    @lidarr {
+        header_regexp domain Host ^(lidarr)\.(.*)$
+    }
+	handle @lidarr {
+        reverse_proxy lidarr:8686
+    }
+
+    # Readarr
+    @readarr-redir {
+        path /readarr /readarr/
+    }
+    handle @readarr-redir {
+        redir https://readarr.{host}
+    }
+    @readarr {
+        header_regexp domain Host ^(readarr)\.(.*)$
+    }
+	handle @readarr {
+        reverse_proxy readarr:8787
+    }
+
+    # Bazarr
+    @bazarr-redir {
+        path /bazarr /bazarr/
+    }
+    handle @bazarr-redir {
+        redir https://bazarr.{host}
+    }
+    @bazarr {
+        header_regexp domain Host ^(bazarr)\.(.*)$
+    }
+	handle @bazarr {
+        reverse_proxy bazarr:6767
+    }
+
+    # Prowlarr
+    @prowlarr-redir {
+        path /prowlarr /prowlarr/
+    }
+    handle @prowlarr-redir {
+        redir https://prowlarr.{host}
+    }
+    @prowlarr {
+        header_regexp domain Host ^(prowlarr)\.(.*)$
+    }
+	handle @prowlarr {
+        reverse_proxy prowlarr:9696
+    }
+
+    # Portainer
+    @portainer-redir {
+        path /portainer /portainer/
+    }
+    handle @portainer-redir {
+        redir https://portainer.{host}
+    }
+    @portainer {
+        header_regexp domain Host ^(portainer)\.(.*)$
+    }
+	handle @portainer {
+        reverse_proxy portainer:9000
+    }
+
+    # Homepage
+    @homepage-redir {
+        path /homepage /homepage/
+    }
+    handle @homepage-redir {
+        redir https://homepage.{host}
+    }
+    @homepage {
+        header_regexp domain Host ^(homepage)\.(.*)$
+    }
+	handle @homepage {
+        reverse_proxy homepage:3000
+    }
+
+    # Kapowarr
+    @kapowarr-redir {
+        path /kapowarr /kapowarr/
+    }
+    handle @kapowarr-redir {
+        redir https://kapowarr.{host}
+    }
+    @kapowarr {
+        header_regexp domain Host ^(kapowarr)\.(.*)$
+    }
+	handle @kapowarr {
+        reverse_proxy kapowarr:5656
+    }
+
+    # Kavita
+    @kavita-redir {
+        path /kavita /kavita/
+    }
+    handle @kavita-redir {
+        redir https://kavita.{host}
+    }
+    @kavita {
+        header_regexp domain Host ^(kavita)\.(.*)$
+    }
+	handle @kavita {
+        reverse_proxy kavita:5000 {
+            header_up X-Forwarded-Host {host}:5000
+            header_up -Origin
+            header_up -Referer
+        }
+    }
+
+    # Nextcloud
+    @nextcloud-redir {
+        path /nextcloud /nextcloud/
+    }
+    handle @nextcloud-redir {
+        redir https://nextcloud.{host}
+    }
+    @nextcloud {
+        header_regexp domain Host ^(nextcloud)\.(.*)$
+    }
+	handle @nextcloud {
+        reverse_proxy nextcloud:80
+    }
+
+    # Overleaf
+    @overleaf-redir {
+        path /overleaf /overleaf/
+    }
+    handle @overleaf-redir {
+        redir https://overleaf.{host}
+    }
+    @overleaf {
+        header_regexp domain Host ^(overleaf)\.(.*)$
+    }
+	handle @overleaf {
+        reverse_proxy overleaf:80
+    }
+
+    # Code Server
+    @code-server-redir {
+        path /code-server /code-server/
+    }
+    handle @code-server-redir {
+        redir https://code-server.{host}
+    }
+    @code-server {
+        header_regexp domain Host ^(code-server)\.(.*)$
+    }
+	handle @code-server {
+        reverse_proxy code-server:8443
+    }
+
+}

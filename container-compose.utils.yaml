@@ -1,0 +1,187 @@
+x-utils-defaults: &utils-defaults
+    networks:
+        - homelab-network
+    # Use the Pi-Hole as DNS for every container
+    dns:
+        - ${PIHOLE_IPV4}
+        - ${PIHOLE_IPV6}
+    # Enable Podman auto-updates
+    labels:
+        - io.containers.autoupdate=registry
+    # Disable escalating privileges
+    security_opt:
+        - no-new-privileges:true
+    # Try restarting 3 times if the container fails, then give up
+    restart: on-failure:3
+    userns_mode: keep-id:uid=${PUID},gid=${PGID}
+    user: 0:0
+
+x-podman:
+    in_pod: false
+
+networks:
+    homelab-network:
+        name: homelab-network
+        enable_ipv6: true
+        ipam:
+            driver: default
+            config:
+                - subnet: ${IPV4_SUBNET}
+                - subnet: ${IPV6_SUBNET}
+        # driver_opts:
+        #     com.docker.network.bridge.name: homelab_net
+            # com.docker.network.container_iface_prefix: homelab_net
+
+# These are other utility network services, supporting and providing access for the media services
+services:
+
+    # Pihole for blocking ads on the network and resolving subdomains for services like qbittorrent.lan
+    pihole:
+        image: docker.io/pihole/pihole
+        container_name: pihole
+        <<: *utils-defaults
+        security_opt:
+            - no-new-privileges:false
+        ports:
+            - "53:53/tcp"
+            - "53:53/udp"
+        # - "67:67/udp" # Only required if you are using Pi-hole as your DHCP server
+        networks:
+            homelab-network:
+                ipv6_address: ${PIHOLE_IPV6}
+                ipv4_address: ${PIHOLE_IPV4}
+        environment:
+            TZ: "Europe/London"
+            PIHOLE_DNS_: "${UNBOUND_IPV4}#5335;${UNBOUND_IPV6}#5335"
+            PIHOLE_UID: ${PUID}
+            PIHOLE_GID: ${PGID}
+            DNSMASQ_USER: "pihole"
+            # INTERFACE: "homelab_net0"
+        volumes:
+            - ${CONFIG_DIRECTORY}/pihole:/etc/pihole
+            - ${CONFIG_DIRECTORY}/dnsmasq:/etc/dnsmasq.d
+        # cap_add:
+        #     # - NET_ADMIN # Required if you are using Pi-hole as your DHCP server, else not needed
+        depends_on:
+            - unbound
+
+
+    # Unbound acts as a recursive DNS resolver, used for out Pi-Hole's upstream DNS server
+    unbound:
+        image: docker.io/mvance/unbound
+        container_name: unbound
+        <<: *utils-defaults
+        # Can only be configured to drop to the _unbound user, or stay as root (see unbound.conf)
+        userns_mode: keep-id:uid=1000,gid=1000
+        networks:
+            homelab-network:
+                ipv6_address: ${UNBOUND_IPV6}
+                ipv4_address: ${UNBOUND_IPV4}
+        volumes:
+            - ${CONFIG_DIRECTORY}/unbound/unbound.conf:/opt/unbound/etc/unbound/unbound.conf
+            - ${CONFIG_DIRECTORY}/unbound/root.hints:/opt/unbound/etc/unbound/root.hints
+            # - "/data/unbound/my_conf/a-records.conf:/opt/unbound/etc/unbound/a-records.conf"
+        cap_add:
+            - NET_ADMIN
+        # The default healthcheck doesn't work due to the non-standard port used to avoid conflicting with Pi-Hole
+        healthcheck:
+            test: drill @127.0.0.1 -p 5335 -D cloudflare.com || exit 1
+            start_period: 10s
+            interval: 60s
+            timeout: 30s
+            retries: 3
+
+    # Samba for sharing files with Windows clients using SMB, I prefer SFTP but people need it
+    samba:
+        image: ghcr.io/servercontainers/samba:smbd-only-latest
+        container_name: samba
+        <<: *utils-defaults
+        ports:
+            - 445:445
+        environment:
+            SAMBA_CONF_LOG_LEVEL: 1
+            # Shouldn't need these (see image tag), but just in case:
+            WSDD2_DISABLE: 1
+            AVAHI_DISABLE: 1
+            NETBIOS_DISABLE: 1
+            # Get SMB hashes with 'docker run -ti --rm --entrypoint create-hash.sh ghcr.io/servercontainers/samba'
+            ACCOUNT_private: ${PRIVATE_USER_HASH}
+            UID_private: ${PRIVATE_USER_UID}
+            ACCOUNT_public: ${PUBLIC_USER_PASSWORD}
+            UID_public: ${PUBLIC_USER_UID}
+            GROUPS_private: public,private
+            # Only private user can access the Private share
+            SAMBA_VOLUME_CONFIG_private: |
+                [Private]
+                path = /shares/private
+                browseable = yes
+                read only = no
+                guest ok = no
+                valid users = private
+            # Private user has read/write, guests have read-only
+            SAMBA_VOLUME_CONFIG_public: |
+                [Public]
+                path = /shares/public
+                browseable = yes
+                guest ok = yes
+                guest user = public
+                read list = public
+                write list = private
+                force user = public
+        volumes:
+            - ${PRIVATE_SHARE_PATH}:/shares/private
+            - ${PUBLIC_SHARE_PATH}:/shares/public
+
+  # Caddy is our reverse proxy, handling TLS and hiding annoying port numbers
+    caddy:
+        image: docker.io/library/caddy
+        container_name: caddy
+        <<: *utils-defaults
+        userns_mode: host
+        ports:
+            # - 80:80
+            - 443:443
+        cap_add:
+            - CAP_NET_BIND_SERVICE
+        volumes:
+            - ${CONFIG_DIRECTORY}/caddy/data/:/data/
+            - ${CONFIG_DIRECTORY}/caddy/config/:/config/
+            - ${CONFIG_DIRECTORY}/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+
+  # Homepage to display all the links, and to show some nice stats
+    homepage:
+        image: ghcr.io/gethomepage/homepage
+        container_name: homepage
+        <<: *utils-defaults
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+            - LOG_LEVEL="debug"
+        volumes:
+            - ${CONFIG_DIRECTORY}/homepage:/app/config
+            - ${SOCKET_PATH}:/var/run/docker.sock
+        depends_on:
+            - caddy
+
+  # Portainer helps debugging and monitors the containers
+    portainer:
+        image: docker.io/portainer/portainer-ce
+        container_name: portainer
+        <<: *utils-defaults
+        security_opt:
+            - no-new-privileges:false
+            # - label:disable
+        volumes:
+            - /etc/localtime:/etc/localtime:ro
+            - ${SOCKET_PATH}:/var/run/docker.sock
+            - ${CONFIG_DIRECTORY}/portainer:/data
+
+  # Watchtower is going to keep our instances updated, not necessary with podman 
+    # watchtower:
+    #     image: containrrr/watchtower
+    #     container_name: watchtower
+    #     <<: *utils-defaults
+    #     environment:
+    #         - WATCHTOWER_CLEANUP=true
+    #     volumes:
+    #         - ${SOCKET_PATH}:/var/run/docker.sock

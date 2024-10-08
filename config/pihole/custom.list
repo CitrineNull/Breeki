@@ -1,0 +1,138 @@
+192.168.0.2 htpc.local
+192.168.0.2 htpc.lan
+192.168.0.2 htpc
+192.168.0.2 breeki.local
+192.168.0.2 breeki.lan
+192.168.0.2 breeki
+
+192.168.0.2 pihole.htpc.local
+192.168.0.2 pihole.htpc.lan
+192.168.0.2 pihole.htpc
+192.168.0.2 pihole.local
+192.168.0.2 pihole.lan
+
+192.168.0.2 pi-hole.htpc.local
+192.168.0.2 pi-hole.htpc.lan
+192.168.0.2 pi-hole.htpc
+192.168.0.2 pi-hole.local
+192.168.0.2 pi-hole.lan
+
+192.168.0.2 qbittorrent.htpc.local
+192.168.0.2 qbittorrent.htpc.lan
+192.168.0.2 qbittorrent.htpc
+192.168.0.2 qbittorrent.local
+192.168.0.2 qbittorrent.lan
+
+192.168.0.2 qbittorrent-public.htpc.local
+192.168.0.2 qbittorrent-public.htpc.lan
+192.168.0.2 qbittorrent-public.htpc
+192.168.0.2 qbittorrent-public.local
+192.168.0.2 qbittorrent-public.lan
+
+192.168.0.2 qbit.htpc.local
+192.168.0.2 qbit.htpc.lan
+192.168.0.2 qbit.htpc
+192.168.0.2 qbit.local
+192.168.0.2 qbit.lan
+
+192.168.0.2 qbittorrent-private.htpc.local
+192.168.0.2 qbittorrent-private.htpc.lan
+192.168.0.2 qbittorrent-private.htpc
+192.168.0.2 qbittorrent-private.local
+192.168.0.2 qbittorrent-private.lan
+
+192.168.0.2 qbit-priv.htpc.local
+192.168.0.2 qbit-priv.htpc.lan
+192.168.0.2 qbit-priv.htpc
+192.168.0.2 qbit-priv.local
+192.168.0.2 qbit-priv.lan
+
+192.168.0.2 jellyfin.htpc.local
+192.168.0.2 jellyfin.htpc.lan
+192.168.0.2 jellyfin.htpc
+192.168.0.2 jellyfin.local
+192.168.0.2 jellyfin.lan
+
+192.168.0.2 sonarr.htpc.local
+192.168.0.2 sonarr.htpc.lan
+192.168.0.2 sonarr.htpc
+192.168.0.2 sonarr.local
+192.168.0.2 sonarr.lan
+
+192.168.0.2 radarr.htpc.local
+192.168.0.2 radarr.htpc.lan
+192.168.0.2 radarr.htpc
+192.168.0.2 radarr.local
+192.168.0.2 radarr.lan
+
+192.168.0.2 lidarr.htpc.local
+192.168.0.2 lidarr.htpc.lan
+192.168.0.2 lidarr.htpc
+192.168.0.2 lidarr.local
+192.168.0.2 lidarr.lan
+
+192.168.0.2 readarr.htpc.local
+192.168.0.2 readarr.htpc.lan
+192.168.0.2 readarr.htpc
+192.168.0.2 readarr.local
+192.168.0.2 readarr.lan
+
+192.168.0.2 bazarr.htpc.local
+192.168.0.2 bazarr.htpc.lan
+192.168.0.2 bazarr.htpc
+192.168.0.2 bazarr.local
+192.168.0.2 bazarr.lan
+
+192.168.0.2 prowlarr.htpc.local
+192.168.0.2 prowlarr.htpc.lan
+192.168.0.2 prowlarr.htpc
+192.168.0.2 prowlarr.local
+192.168.0.2 prowlarr.lan
+
+192.168.0.2 portainer.htpc.local
+192.168.0.2 portainer.htpc.lan
+192.168.0.2 portainer.htpc
+192.168.0.2 portainer.local
+192.168.0.2 portainer.lan
+
+192.168.0.2 homepage.htpc.local
+192.168.0.2 homepage.htpc.lan
+192.168.0.2 homepage.htpc
+192.168.0.2 homepage.local
+192.168.0.2 homepage.lan
+
+192.168.0.2 kapowarr.htpc.local
+192.168.0.2 kapowarr.htpc.lan
+192.168.0.2 kapowarr.htpc
+192.168.0.2 kapowarr.local
+192.168.0.2 kapowarr.lan
+
+192.168.0.2 kavita.htpc.local
+192.168.0.2 kavita.htpc.lan
+192.168.0.2 kavita.htpc
+192.168.0.2 kavita.local
+192.168.0.2 kavita.lan
+
+192.168.0.2 nextcloud.htpc.local
+192.168.0.2 nextcloud.htpc.lan
+192.168.0.2 nextcloud.htpc
+192.168.0.2 nextcloud.local
+192.168.0.2 nextcloud.lan
+
+192.168.0.2 overleaf.htpc.local
+192.168.0.2 overleaf.htpc.lan
+192.168.0.2 overleaf.htpc
+192.168.0.2 overleaf.local
+192.168.0.2 overleaf.lan
+
+192.168.0.2 code-server.htpc.local
+192.168.0.2 code-server.htpc.lan
+192.168.0.2 code-server.htpc
+192.168.0.2 code-server.local
+192.168.0.2 code-server.lan
+
+192.168.0.2 jellyseerr.htpc.local
+192.168.0.2 jellyseerr.htpc.lan
+192.168.0.2 jellyseerr.htpc
+192.168.0.2 jellyseerr.local
+192.168.0.2 jellyseerr.lan
